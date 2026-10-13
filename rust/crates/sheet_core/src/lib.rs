@@ -11,6 +11,7 @@ pub mod formula;
 pub mod input;
 pub mod model;
 pub mod numfmt;
+pub mod pdf;
 pub mod ods;
 pub mod refs;
 pub mod style;

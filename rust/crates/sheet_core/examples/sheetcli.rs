@@ -5,6 +5,7 @@
 //! sheetcli set   FILE OUT CELL=INPUT  edit cells (Sheet!A1=text) and save
 //! sheetcli conv  FILE OUT             open and save in OUT's format
 //! sheetcli recalc FILE                recalculate everything, show differences
+//! sheetcli pdf   FILE OUT              print to PDF
 //! ```
 
 use sheet_core::edit::Op;
@@ -46,6 +47,16 @@ fn main() {
                     }
                 }
             }
+        }
+        Some("pdf") => {
+            let wb = open(&args[1]);
+            let mut book = doc_font::FontBook::new();
+            for dir in ["/usr/share/fonts", "/system/fonts", "/System/Library/Fonts", "/Library/Fonts"] {
+                book.add_dir(std::path::Path::new(dir));
+            }
+            let bytes = sheet_core::pdf::export(&wb, &mut book, &sheet_core::pdf::PdfOptions::default());
+            std::fs::write(&args[2], bytes).unwrap();
+            println!("wrote {}", args[2]);
         }
         Some("set") => {
             let mut wb = open(&args[1]);

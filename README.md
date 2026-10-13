@@ -17,6 +17,7 @@ scratch in Rust, with a Dart API over `dart:ffi`.
 | `xlsx` | XLSX/XLSM read and in-place write: unchanged parts copied byte for byte, only changed sheets regenerated, styles and shared strings appended, `calcChain.xml` dropped |
 | `ods` | ODS read and in-place write: unchanged tables kept verbatim, OpenFormula translated both ways, comments, validations and conditional formats kept |
 | `csv` | CSV/TSV with encoding, delimiter and `sep=` detection; each field's text kept until edited |
+| `pdf` | Printing to PDF: pages down then across, fit-to-width for slightly wide sheets, fills, borders, alignment, wrapping, merged cells, overflowing text |
 
 `rust/crates/sheet_ffi` exports the engine to Dart (`sheet_open`,
 `sheet_cells_json`, `sheet_apply`, `sheet_save`, ...). `lib/` holds the Dart

@@ -109,8 +109,9 @@ class CellRange {
   int get hashCode => Object.hash(r0, c0, r1, c1);
 
   @override
-  String toString() =>
-      r0 == r1 && c0 == c1 ? cellName(r0, c0) : '${cellName(r0, c0)}:${cellName(r1, c1)}';
+  String toString() => r0 == r1 && c0 == c1
+      ? cellName(r0, c0)
+      : '${cellName(r0, c0)}:${cellName(r1, c1)}';
 }
 
 /// `A`, `B`, ... `AA` for a 0-based column.
@@ -157,7 +158,10 @@ class SheetInfo {
     used: j['used'] == null ? null : CellRange.fromJson(j['used'] as List),
     freeze: j['freeze'] == null
         ? null
-        : (row: (j['freeze'] as List)[0] as int, col: (j['freeze'] as List)[1] as int),
+        : (
+            row: (j['freeze'] as List)[0] as int,
+            col: (j['freeze'] as List)[1] as int,
+          ),
     showGrid: j['showGrid'] != false,
     defaultColWidth: (j['defaultColWidth'] as num?)?.toDouble() ?? 8.43,
     defaultRowHeight: (j['defaultRowHeight'] as num?)?.toDouble() ?? 15,
@@ -226,8 +230,13 @@ class WorkbookInfo {
         (sheet: c[0] as int, row: c[1] as int, col: c[2] as int),
     ],
     names: [
-      for (final n in (j['names'] as List? ?? const []).cast<Map<String, dynamic>>())
-        SheetName(n['name'] as String, n['sheet'] as int?, n['refersTo'] as String? ?? ''),
+      for (final n
+          in (j['names'] as List? ?? const []).cast<Map<String, dynamic>>())
+        SheetName(
+          n['name'] as String,
+          n['sheet'] as int?,
+          n['refersTo'] as String? ?? '',
+        ),
     ],
   );
 
@@ -645,10 +654,9 @@ class SheetBook {
     final b = _b;
     final list =
         jsonDecode(
-              _withStrings(
-                [jsonEncode(ids.toList())],
-                (p) => _takeString(b, b.stylesJson(handle, p[0])),
-              ),
+              _withStrings([
+                jsonEncode(ids.toList()),
+              ], (p) => _takeString(b, b.stylesJson(handle, p[0]))),
             )
             as List;
     return {
@@ -666,10 +674,9 @@ class SheetBook {
   /// person when the edit is refused.
   SheetEditResult apply(Map<String, Object?> op) {
     final b = _b;
-    final json = _withStrings(
-      [jsonEncode(op)],
-      (p) => _takeString(b, b.apply(handle, p[0])),
-    );
+    final json = _withStrings([
+      jsonEncode(op),
+    ], (p) => _takeString(b, b.apply(handle, p[0])));
     return SheetEditResult.fromJson(jsonDecode(json) as Map<String, dynamic>);
   }
 
@@ -681,10 +688,9 @@ class SheetBook {
     final encoded = jsonEncode(op);
     return Isolate.run(() {
       final b = SheetBindings.instance;
-      final json = _withStrings(
-        [encoded],
-        (p) => _takeString(b, b.apply(handle, p[0])),
-      );
+      final json = _withStrings([
+        encoded,
+      ], (p) => _takeString(b, b.apply(handle, p[0])));
       return SheetEditResult.fromJson(jsonDecode(json) as Map<String, dynamic>);
     });
   }
@@ -745,6 +751,33 @@ class SheetBook {
     });
   }
 
+  /// Print to a PDF at [path] on a background isolate, with fonts from
+  /// [fontDirs]: every visible sheet, or [sheets]. Returns the page count.
+  Future<int> exportPdf(
+    String path, {
+    List<String> fontDirs = const [],
+    List<int> sheets = const [],
+    bool gridlines = true,
+    String? title,
+  }) {
+    _b;
+    final handle = this.handle;
+    final options = jsonEncode({
+      'fontDirs': fontDirs,
+      'sheets': sheets,
+      'gridlines': gridlines,
+      'title': title,
+    });
+    return Isolate.run(() {
+      final b = SheetBindings.instance;
+      final json = _withStrings([
+        path,
+        options,
+      ], (p) => _takeString(b, b.exportPdf(handle, p[0], p[1])));
+      return (jsonDecode(json) as Map<String, dynamic>)['pages'] as int;
+    });
+  }
+
   /// Cells whose shown text contains [query]. [sheet] null searches all.
   List<({int sheet, int row, int col})> find(
     String query, {
@@ -759,7 +792,8 @@ class SheetBook {
         (matchCase ? 1 : 0) | (wholeCell ? 2 : 0) | (inFormulas ? 4 : 0);
     final json = _withStrings(
       [query],
-      (p) => _takeString(b, b.findJson(handle, p[0], flags, sheet ?? -1, limit)),
+      (p) =>
+          _takeString(b, b.findJson(handle, p[0], flags, sheet ?? -1, limit)),
     );
     return [
       for (final f in (jsonDecode(json) as List).cast<List>())
@@ -771,10 +805,9 @@ class SheetBook {
   /// anything. Returns the value as text.
   String evaluate(int sheet, int row, int col, String formula) {
     final b = _b;
-    final json = _withStrings(
-      [formula],
-      (p) => _takeString(b, b.evaluateJson(handle, sheet, row, col, p[0])),
-    );
+    final json = _withStrings([
+      formula,
+    ], (p) => _takeString(b, b.evaluateJson(handle, sheet, row, col, p[0])));
     return (jsonDecode(json) as Map<String, dynamic>)['text'] as String;
   }
 

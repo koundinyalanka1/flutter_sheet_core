@@ -78,10 +78,36 @@ void main() {
     expect(info.format, SheetFormat.xlsx);
     expect(info.sheets.single.used, const CellRange(0, 0, 2, 0));
     expect(again.find('30').single.row, 2);
-    final warnings = await again.writeCopy('${dir.path}/book.csv', SheetFormat.csv);
+    final warnings = await again.writeCopy(
+      '${dir.path}/book.csv',
+      SheetFormat.csv,
+    );
     expect(warnings, hasLength(1));
-    expect(File('${dir.path}/book.csv').readAsStringSync(), '10\r\n20\r\n30\r\n');
+    expect(
+      File('${dir.path}/book.csv').readAsStringSync(),
+      '10\r\n20\r\n30\r\n',
+    );
     again.close();
+    await dir.delete(recursive: true);
+  }, skip: !available);
+
+  test('prints a workbook to PDF', () async {
+    final book = SheetCore.create();
+    book.setCell(0, 0, 0, 'Item');
+    book.setCell(0, 1, 0, 'Rice');
+    final dir = await Directory.systemTemp.createTemp('sheet_pdf');
+    final pages = await book.exportPdf(
+      '${dir.path}/book.pdf',
+      fontDirs: ['/usr/share/fonts'],
+    );
+    expect(pages, 1);
+    expect(
+      String.fromCharCodes(
+        File('${dir.path}/book.pdf').readAsBytesSync().take(5),
+      ),
+      '%PDF-',
+    );
+    book.close();
     await dir.delete(recursive: true);
   }, skip: !available);
 }

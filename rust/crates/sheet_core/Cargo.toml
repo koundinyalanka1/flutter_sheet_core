@@ -10,4 +10,7 @@ doc_zip = { path = "../../../../doc_common/crates/doc_zip" }
 doc_xml = { path = "../../../../doc_common/crates/doc_xml" }
 doc_encoding = { path = "../../../../doc_common/crates/doc_encoding" }
 doc_opc = { path = "../../../../doc_common/crates/doc_opc" }
+doc_font = { path = "../../../../doc_common/crates/doc_font" }
+doc_pdf = { path = "../../../../doc_common/crates/doc_pdf" }
+doc_layout = { path = "../../../../doc_common/crates/doc_layout" }
 thiserror = "1"

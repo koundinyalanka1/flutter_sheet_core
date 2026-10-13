@@ -666,6 +666,53 @@ pub unsafe extern "C" fn sheet_write_copy(handle: i64, path: *const c_char, form
     })
 }
 
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct PdfOptionsJson {
+    font_dirs: Vec<String>,
+    /// Sheet indexes; empty for every visible sheet.
+    sheets: Vec<usize>,
+    gridlines: Option<bool>,
+    title: Option<String>,
+    /// Page width and height in points (portrait).
+    page: Option<(f32, f32)>,
+}
+
+/// Print the workbook (or some sheets) to a PDF at `path`. `options_json`:
+/// `{"fontDirs": [...], "sheets": [0], "gridlines": true, "title": "...",
+/// "page": [595, 842]}`. Returns `{"pages"}`.
+///
+/// # Safety
+/// String arguments must be NULL or valid NUL-terminated UTF-8.
+#[no_mangle]
+pub unsafe extern "C" fn sheet_export_pdf(handle: i64, path: *const c_char, options_json: *const c_char) -> *mut c_char {
+    call_str(|| {
+        let path = str_arg(path, "path")?;
+        let o: PdfOptionsJson = match opt_str_arg(options_json, "options")? {
+            Some(j) => serde_json::from_str(j).map_err(|e| FfiError::invalid(format!("bad options: {e}")))?,
+            None => PdfOptionsJson::default(),
+        };
+        let book = doc_font::FontBook::shared();
+        let mut book = book.lock().unwrap_or_else(|e| e.into_inner());
+        for d in &o.font_dirs {
+            book.add_dir(std::path::Path::new(d));
+        }
+        BOOKS.with(handle, |wb| {
+            let mut opts = sheet_core::pdf::PdfOptions { sheets: o.sheets.clone(), title: o.title.clone(), ..Default::default() };
+            if let Some(g) = o.gridlines {
+                opts.gridlines = g;
+            }
+            if let Some(p) = o.page {
+                opts.page = p;
+            }
+            let bytes = sheet_core::pdf::export(wb, &mut book, &opts);
+            let pages = String::from_utf8_lossy(&bytes).matches("/Type /Page ").count();
+            write_file_atomically(path, &bytes)?;
+            to_json(&json!({"pages": pages}))
+        })
+    })
+}
+
 /// Find cells whose shown text contains `query`. `flags`: 1 match case,
 /// 2 whole cell, 4 look in formulas. `sheet` -1 searches every sheet.
 /// Returns `[[sheet, row, col]]`.

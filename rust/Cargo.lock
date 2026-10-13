@@ -32,12 +32,44 @@ name = "doc_ffi"
 version = "0.1.0"
 
 [[package]]
+name = "doc_font"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "doc_image"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "thiserror",
+]
+
+[[package]]
+name = "doc_layout"
+version = "0.1.0"
+dependencies = [
+ "doc_font",
+ "doc_pdf",
+]
+
+[[package]]
 name = "doc_opc"
 version = "0.1.0"
 dependencies = [
  "doc_xml",
  "doc_zip",
  "thiserror",
+]
+
+[[package]]
+name = "doc_pdf"
+version = "0.1.0"
+dependencies = [
+ "doc_font",
+ "doc_image",
+ "flate2",
 ]
 
 [[package]]
@@ -155,7 +187,10 @@ name = "sheet_core"
 version = "0.1.0"
 dependencies = [
  "doc_encoding",
+ "doc_font",
+ "doc_layout",
  "doc_opc",
+ "doc_pdf",
  "doc_xml",
  "doc_zip",
  "thiserror",
@@ -166,6 +201,7 @@ name = "sheet_ffi"
 version = "0.1.0"
 dependencies = [
  "doc_ffi",
+ "doc_font",
  "serde",
  "serde_json",
  "sheet_core",

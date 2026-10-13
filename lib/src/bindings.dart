@@ -73,6 +73,7 @@ class SheetBindings {
       redo = lib.lookupFunction<_HandleStrC, _HandleStrDart>('sheet_redo'),
       save = lib.lookupFunction<_SaveC, _SaveDart>('sheet_save'),
       writeCopy = lib.lookupFunction<_SaveC, _SaveDart>('sheet_write_copy'),
+      exportPdf = lib.lookupFunction<_SaveC, _SaveDart>('sheet_export_pdf'),
       findJson = lib.lookupFunction<_FindC, _FindDart>('sheet_find_json'),
       evaluateJson = lib.lookupFunction<_EvalC, _EvalDart>(
         'sheet_evaluate_json',
@@ -109,6 +110,7 @@ class SheetBindings {
   final _HandleStrDart redo;
   final _SaveDart save;
   final _SaveDart writeCopy;
+  final _SaveDart exportPdf;
   final _FindDart findJson;
   final _EvalDart evaluateJson;
   final _HandleStrDart recalc;

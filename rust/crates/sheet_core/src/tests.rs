@@ -328,3 +328,40 @@ fn ods_round_trip() {
     assert_eq!(val(&again, 1, "A1"), n(1011.0));
     assert_eq!(val(&again, 0, "A6"), Value::text("Two  spaces\nand a line"));
 }
+
+#[test]
+fn exports_sheets_to_pdf() {
+    let mut wb = budget();
+    wb.apply(Op::Format {
+        sheet: 0,
+        ranges: vec![range("A1:D1")],
+        patch: StylePatch {
+            bold: Some(true),
+            fill: Some(Some(crate::style::ColorSpec::Rgb(0xFFFF00))),
+            ..StylePatch::default()
+        },
+    })
+    .unwrap();
+    set(&mut wb, 0, "A6", "A long note that runs into the empty cells beside it");
+    let mut book = doc_font::FontBook::new();
+    book.add_dir(std::path::Path::new("/usr/share/fonts/truetype"));
+    let bytes = crate::pdf::export(&wb, &mut book, &crate::pdf::PdfOptions::default());
+    assert!(bytes.starts_with(b"%PDF"));
+    let path = std::env::temp_dir().join(format!("sheet_pdf_{}.pdf", std::process::id()));
+    std::fs::write(&path, &bytes).unwrap();
+    if !book.is_empty() {
+        if let Ok(out) = std::process::Command::new("pdftotext").arg("-layout").arg(&path).arg("-").output() {
+            if out.status.success() {
+                let t = String::from_utf8_lossy(&out.stdout);
+                assert!(t.contains("Rice") && t.contains("525") && t.contains("1005"), "{t}");
+                assert!(t.contains("runs into the empty cells"), "{t}");
+            }
+        }
+    }
+    if std::env::var("KEEP_PDF").is_err() {
+        let _ = std::fs::remove_file(&path);
+    } else {
+        eprintln!("kept {}", path.display());
+    }
+}
+
