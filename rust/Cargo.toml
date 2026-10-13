@@ -1,0 +1,12 @@
+# The spreadsheet engine behind flutter_sheet_core.
+[workspace]
+resolver = "2"
+members = ["crates/sheet_core", "crates/sheet_ffi"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[profile.test]
+opt-level = 1

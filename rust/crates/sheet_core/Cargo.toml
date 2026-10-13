@@ -1,0 +1,12 @@
+[package]
+name = "sheet_core"
+version = "0.1.0"
+edition = "2021"
+license = "Proprietary"
+description = "Spreadsheets: model, formulas, number formats, XLSX/ODS/CSV reading and writing, editing."
+
+[dependencies]
+doc_zip = { path = "../../../../doc_common/crates/doc_zip" }
+doc_xml = { path = "../../../../doc_common/crates/doc_xml" }
+doc_encoding = { path = "../../../../doc_common/crates/doc_encoding" }
+thiserror = "1"
