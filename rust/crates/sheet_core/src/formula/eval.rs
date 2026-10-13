@@ -29,6 +29,14 @@ pub trait Grid {
     fn random(&mut self) -> f64;
     /// The formula text of a cell, if it holds one (FORMULATEXT, ISFORMULA).
     fn formula_text(&self, sheet: usize, cell: CellRef) -> Option<String>;
+    /// Whether a row is hidden (SUBTOTAL 101-111, AGGREGATE).
+    fn row_hidden(&self, _sheet: usize, _row: u32) -> bool {
+        false
+    }
+    /// A sheet's name, for CELL-like functions and INDIRECT.
+    fn sheet_name(&self, _sheet: usize) -> Option<String> {
+        None
+    }
 }
 
 /// A rectangle on a particular sheet.
@@ -57,7 +65,7 @@ impl Array {
     }
 
     /// Element for broadcasting: a single row or column repeats.
-    fn broadcast(&self, row: usize, col: usize) -> Value {
+    pub fn broadcast(&self, row: usize, col: usize) -> Value {
         let r = if self.rows == 1 { 0 } else { row };
         let c = if self.cols == 1 { 0 } else { col };
         if r < self.rows && c < self.cols {

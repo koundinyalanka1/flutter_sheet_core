@@ -1,9 +1,10 @@
 /// flutter_sheet_core: DocHelper's spreadsheet engine, built from scratch in
 /// Rust.
 ///
-/// The engine evaluates formulas, formats values the way Excel does, and
-/// reads and writes XLSX, ODS and CSV files. The Dart API grows as the
-/// engine lands; for now it reports the native library and its version.
+/// The engine reads and writes XLSX, XLSM, ODS, CSV and TSV files in place,
+/// formats values the way Excel does, computes about 280 worksheet
+/// functions, recalculates only what an edit affects, and keeps undo and
+/// redo history.
 library;
 
-export 'src/sheet_core_api.dart' show SheetCore, SheetCoreException;
+export 'src/sheet_core_api.dart';

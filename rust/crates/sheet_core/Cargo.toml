@@ -9,4 +9,5 @@ description = "Spreadsheets: model, formulas, number formats, XLSX/ODS/CSV readi
 doc_zip = { path = "../../../../doc_common/crates/doc_zip" }
 doc_xml = { path = "../../../../doc_common/crates/doc_xml" }
 doc_encoding = { path = "../../../../doc_common/crates/doc_encoding" }
+doc_opc = { path = "../../../../doc_common/crates/doc_opc" }
 thiserror = "1"

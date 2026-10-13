@@ -31,17 +31,89 @@ pub fn needs_xlfn_prefix(name: &str) -> bool {
     XLFN_FUNCTIONS.binary_search(&name).is_ok() || XLFN_FUNCTIONS.contains(&name)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Excel,
+    Ooxml,
+    Odf,
+}
+
 /// The formula as text, without the leading `=`.
 pub fn unparse(expr: &Expr) -> String {
     let mut out = String::new();
-    write(expr, &mut out, false);
+    write(expr, &mut out, Mode::Excel);
     out
 }
 
 /// The formula as OOXML stores it: newer functions get `_xlfn.`.
 pub fn unparse_ooxml(expr: &Expr) -> String {
     let mut out = String::new();
-    write(expr, &mut out, true);
+    write(expr, &mut out, Mode::Ooxml);
+    out
+}
+
+/// The formula in OpenFormula syntax, as OpenDocument stores it (with its
+/// `of:=` prefix): `of:=SUM([.A1:.B3];[Sheet2.C1])`.
+pub fn unparse_odf(expr: &Expr) -> String {
+    let mut out = String::from("of:=");
+    write(expr, &mut out, Mode::Odf);
+    out
+}
+
+fn odf_sheet(name: &str) -> String {
+    let plain = !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_');
+    if plain {
+        name.to_owned()
+    } else {
+        format!("'{}'", name.replace('\'', "''"))
+    }
+}
+
+/// A reference in OpenFormula's bracketed form.
+pub fn odf_reference_text(r: &Reference) -> String {
+    let mut out = String::from("[");
+    let sheet = |out: &mut String, s: Option<&String>| {
+        if let Some(s) = s {
+            out.push('$');
+            out.push_str(&odf_sheet(s));
+        }
+        out.push('.');
+    };
+    let full = |a: CellAddr, row: bool, col: bool, last: bool| -> CellAddr {
+        let mut a = a;
+        if !row {
+            a.row = if last { crate::refs::MAX_ROWS - 1 } else { 0 };
+        }
+        if !col {
+            a.col = if last { crate::refs::MAX_COLS - 1 } else { 0 };
+        }
+        a
+    };
+    let (a, b) = match r.area {
+        None => {
+            out.push_str("#REF!]");
+            return out;
+        }
+        Some(Area::Cell(a)) => (a, None),
+        Some(Area::Range(a, b)) => (a, Some(b)),
+        Some(Area::Cols(a, b)) => (full(a, false, true, false), Some(full(b, false, true, true))),
+        Some(Area::Rows(a, b)) => (full(a, true, false, false), Some(full(b, true, false, true))),
+    };
+    sheet(&mut out, r.sheet.as_ref());
+    addr(a, &mut out, true, true);
+    if let Some(b) = b {
+        out.push(':');
+        match &r.last_sheet {
+            Some(last) => sheet(&mut out, Some(last)),
+            None => out.push('.'),
+        }
+        addr(b, &mut out, true, true);
+    } else if let Some(last) = &r.last_sheet {
+        out.push(':');
+        sheet(&mut out, Some(last));
+        addr(a, &mut out, true, true);
+    }
+    out.push(']');
     out
 }
 
@@ -120,7 +192,9 @@ pub fn reference_text(r: &Reference) -> String {
     out
 }
 
-fn write(expr: &Expr, out: &mut String, ooxml: bool) {
+fn write(expr: &Expr, out: &mut String, mode: Mode) {
+    let ooxml = mode == Mode::Ooxml;
+    let odf = mode == Mode::Odf;
     match expr {
         Expr::Number(n) => out.push_str(&number_literal(*n)),
         Expr::Text(t) => {
@@ -128,21 +202,27 @@ fn write(expr: &Expr, out: &mut String, ooxml: bool) {
             out.push_str(&t.replace('"', "\"\""));
             out.push('"');
         }
+        Expr::Bool(b) if odf => out.push_str(if *b { "TRUE()" } else { "FALSE()" }),
         Expr::Bool(b) => out.push_str(if *b { "TRUE" } else { "FALSE" }),
         Expr::Error(e) => out.push_str(e.as_str()),
+        Expr::Ref(r) if odf => out.push_str(&odf_reference_text(r)),
         Expr::Ref(r) => out.push_str(&reference_text(r)),
         Expr::Name(n) | Expr::Structured(n) => out.push_str(n),
         Expr::Unary(op, e) => {
             out.push(if *op == UnaryOp::Neg { '-' } else { '+' });
-            write(e, out, ooxml);
+            write(e, out, mode);
         }
         Expr::Binary(op, a, b) => {
-            write(a, out, ooxml);
-            out.push_str(op.symbol());
-            write(b, out, ooxml);
+            write(a, out, mode);
+            match (odf, op) {
+                (true, super::ast::BinaryOp::Union) => out.push('~'),
+                (true, super::ast::BinaryOp::Intersect) => out.push('!'),
+                _ => out.push_str(op.symbol()),
+            }
+            write(b, out, mode);
         }
         Expr::Percent(e) => {
-            write(e, out, ooxml);
+            write(e, out, mode);
             out.push('%');
         }
         Expr::Call(name, args) => {
@@ -153,9 +233,9 @@ fn write(expr: &Expr, out: &mut String, ooxml: bool) {
             out.push('(');
             for (i, arg) in args.iter().enumerate() {
                 if i > 0 {
-                    out.push(',');
+                    out.push(if odf { ';' } else { ',' });
                 }
-                write(arg, out, ooxml);
+                write(arg, out, mode);
             }
             out.push(')');
         }
@@ -163,13 +243,13 @@ fn write(expr: &Expr, out: &mut String, ooxml: bool) {
             out.push('{');
             for (r, row) in rows.iter().enumerate() {
                 if r > 0 {
-                    out.push(';');
+                    out.push(if odf { '|' } else { ';' });
                 }
                 for (c, e) in row.iter().enumerate() {
                     if c > 0 {
-                        out.push(',');
+                        out.push(if odf { ';' } else { ',' });
                     }
-                    write(e, out, ooxml);
+                    write(e, out, mode);
                 }
             }
             out.push('}');
@@ -177,7 +257,7 @@ fn write(expr: &Expr, out: &mut String, ooxml: bool) {
         Expr::Missing => {}
         Expr::Paren(e) => {
             out.push('(');
-            write(e, out, ooxml);
+            write(e, out, mode);
             out.push(')');
         }
     }

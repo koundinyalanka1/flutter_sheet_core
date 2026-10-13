@@ -124,6 +124,89 @@ pub fn weekday(serial: f64, date1904: bool) -> Option<u32> {
     Some(((days + 4).rem_euclid(7) + 1) as u32)
 }
 
+/// An ISO 8601 date or date-time (`2026-10-13T10:30:00`) as a serial.
+pub fn iso_to_serial(text: &str, date1904: bool) -> Option<f64> {
+    let (date, time) = match text.split_once('T') {
+        Some((d, t)) => (d, Some(t)),
+        None => (text, None),
+    };
+    let mut parts = date.split('-');
+    let y: i64 = parts.next()?.parse().ok()?;
+    let m: i64 = parts.next()?.parse().ok()?;
+    let d: i64 = parts.next()?.parse().ok()?;
+    let mut serial = date_to_serial(y, m, d, date1904)?;
+    if let Some(t) = time {
+        let t = t.trim_end_matches('Z');
+        let mut tp = t.split(':');
+        let h: f64 = tp.next()?.parse().ok()?;
+        let mi: f64 = tp.next().unwrap_or("0").parse().ok()?;
+        let s: f64 = tp.next().unwrap_or("0").parse().ok()?;
+        serial += (h * 3600.0 + mi * 60.0 + s) / 86_400.0;
+    }
+    Some(serial)
+}
+
+/// An ISO 8601 duration (`PT10H30M00S`, `P1DT2H`) in days, as ODF stores
+/// times.
+pub fn iso_duration_days(text: &str) -> Option<f64> {
+    let t = text.trim();
+    let (neg, t) = match t.strip_prefix('-') {
+        Some(r) => (true, r),
+        None => (false, t),
+    };
+    let t = t.strip_prefix('P')?;
+    let (date, time) = match t.split_once('T') {
+        Some((d, tm)) => (d, tm),
+        None => (t, ""),
+    };
+    let mut days = 0.0;
+    let mut num = String::new();
+    for c in date.chars() {
+        if c.is_ascii_digit() || c == '.' {
+            num.push(c);
+        } else {
+            let n: f64 = num.parse().ok()?;
+            num.clear();
+            match c {
+                'D' => days += n,
+                'W' => days += n * 7.0,
+                _ => return None,
+            }
+        }
+    }
+    for c in time.chars() {
+        if c.is_ascii_digit() || c == '.' {
+            num.push(c);
+        } else {
+            let n: f64 = num.parse().ok()?;
+            num.clear();
+            match c {
+                'H' => days += n / 24.0,
+                'M' => days += n / 1440.0,
+                'S' => days += n / 86_400.0,
+                _ => return None,
+            }
+        }
+    }
+    Some(if neg { -days } else { days })
+}
+
+/// A serial as an ISO 8601 date-time (`2026-10-13` or `2026-10-13T10:30:00`).
+pub fn serial_to_iso(serial: f64, date1904: bool) -> Option<String> {
+    let (y, m, d) = serial_to_date(serial, date1904)?;
+    let (y, m, d) = if !date1904 && serial.floor() == 60.0 { (1900, 2, 28) } else if !date1904 && serial.floor() == 0.0 { (1899, 12, 31) } else { (y, m, d) };
+    let frac = serial - serial.floor();
+    if frac.abs() < 1e-9 {
+        return Some(format!("{y:04}-{m:02}-{d:02}"));
+    }
+    let (h, mi, s, ms) = time_of_day(serial);
+    if ms > 0 {
+        Some(format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}.{ms:03}"))
+    } else {
+        Some(format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}"))
+    }
+}
+
 pub fn is_leap_year(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }

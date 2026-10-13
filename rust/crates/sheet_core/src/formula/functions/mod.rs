@@ -13,7 +13,7 @@ mod text;
 pub use criteria::{wildcard_match, Criteria};
 
 use super::ast::Expr;
-use super::eval::{Eval, Evaluator, SheetArea};
+use super::eval::{Eval, Evaluator};
 use crate::value::{CellError, Value};
 
 /// Call a worksheet function. None when the function is unknown.
@@ -108,13 +108,90 @@ macro_rules! tri {
 }
 pub(crate) use tri;
 
-/// A reference argument as a single area, or the error to return.
-pub(crate) fn single_area(ev: &mut Evaluator, args: &[Expr], i: usize) -> Result<SheetArea, CellError> {
-    match ev.reference_arg(args, i) {
-        Some(areas) if areas.len() == 1 => Ok(areas[0]),
-        Some(_) => Err(CellError::Value),
-        None => Err(CellError::Value),
+/// `tri!` for the dispatchers, which return `Option<Eval>`.
+macro_rules! tri_some {
+    ($e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(err) => return Some($crate::formula::eval::Eval::error(err)),
+        }
+    };
+}
+pub(crate) use tri_some;
+
+
+/// Evaluate every argument and apply `f` to their values. When any argument
+/// is a multi-cell reference or an array, `f` runs element by element with
+/// broadcasting (dynamic-array semantics) and the result is an array.
+pub(crate) fn lift(ev: &mut Evaluator, args: &[Expr], f: &mut dyn FnMut(&[Value]) -> Value) -> Eval {
+    let evals: Vec<Eval> = args.iter().map(|a| ev.eval(a)).collect();
+    if !evals.iter().any(|e| ev.is_multi(e)) {
+        let values: Vec<Value> = evals.into_iter().map(|e| ev.scalar(e)).collect();
+        return Eval::Value(f(&values));
     }
+    let arrays: Vec<super::eval::Array> = evals.into_iter().map(|e| ev.to_array(e)).collect();
+    let rows = arrays.iter().map(|a| a.rows).max().unwrap_or(1);
+    let cols = arrays.iter().map(|a| a.cols).max().unwrap_or(1);
+    let mut data = Vec::with_capacity(rows * cols);
+    let mut values = Vec::with_capacity(arrays.len());
+    for r in 0..rows {
+        for c in 0..cols {
+            values.clear();
+            values.extend(arrays.iter().map(|a| a.broadcast(r, c)));
+            data.push(f(&values));
+        }
+    }
+    Eval::Array(super::eval::Array::new(rows, cols, data))
+}
+
+/// A one-number function applied element by element.
+pub(crate) fn lift_num1(ev: &mut Evaluator, args: &[Expr], f: impl Fn(f64) -> Result<f64, CellError>) -> Eval {
+    if let Some(e) = arity(args, 1, 1) {
+        return e;
+    }
+    lift(ev, args, &mut |v| match v[0].to_number().and_then(&f) {
+        Ok(n) if n.is_finite() => Value::Number(n),
+        Ok(_) => Value::Error(CellError::Num),
+        Err(e) => Value::Error(e),
+    })
+}
+
+/// A function of several numbers applied element by element. Omitted
+/// trailing arguments take their defaults.
+pub(crate) fn lift_nums(
+    ev: &mut Evaluator,
+    args: &[Expr],
+    min: usize,
+    defaults: &[f64],
+    f: impl Fn(&[f64]) -> Result<f64, CellError>,
+) -> Eval {
+    let max = min + defaults.len();
+    if let Some(e) = arity(args, min, max) {
+        return e;
+    }
+    let given = args.len();
+    let mut nums = vec![0.0; max];
+    lift(ev, args, &mut |v| {
+        for (i, x) in v.iter().enumerate() {
+            match x.to_number() {
+                Ok(n) => nums[i] = n,
+                Err(e) => return Value::Error(e),
+            }
+        }
+        for i in given..max {
+            nums[i] = defaults[i - min];
+        }
+        match f(&nums) {
+            Ok(n) if n.is_finite() => Value::Number(n),
+            Ok(_) => Value::Error(CellError::Num),
+            Err(e) => Value::Error(e),
+        }
+    })
+}
+
+/// Whether an optional argument was left out (absent or empty).
+pub(crate) fn omitted(args: &[Expr], i: usize) -> bool {
+    matches!(args.get(i), None | Some(Expr::Missing))
 }
 
 /// The values of an argument as a 2-D array (references and arrays alike).

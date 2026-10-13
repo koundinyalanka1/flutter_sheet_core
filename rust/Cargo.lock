@@ -32,6 +32,15 @@ name = "doc_ffi"
 version = "0.1.0"
 
 [[package]]
+name = "doc_opc"
+version = "0.1.0"
+dependencies = [
+ "doc_xml",
+ "doc_zip",
+ "thiserror",
+]
+
+[[package]]
 name = "doc_xml"
 version = "0.1.0"
 dependencies = [
@@ -146,6 +155,7 @@ name = "sheet_core"
 version = "0.1.0"
 dependencies = [
  "doc_encoding",
+ "doc_opc",
  "doc_xml",
  "doc_zip",
  "thiserror",

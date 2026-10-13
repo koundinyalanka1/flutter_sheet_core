@@ -250,3 +250,26 @@ pub fn move_block(
     });
     changed
 }
+
+/// A plain range after rows or columns were inserted or deleted on its
+/// sheet (merges, column widths, array formula ranges). None when it was
+/// deleted entirely.
+pub fn shift_range(range: crate::refs::Range, shift: Shift) -> Option<crate::refs::Range> {
+    let addr = |c: crate::refs::CellRef| CellAddr {
+        row: c.row,
+        col: c.col,
+        row_abs: false,
+        col_abs: false,
+    };
+    match shift_area(Area::Range(addr(range.start), addr(range.end)), shift)? {
+        Area::Range(a, b) => Some(crate::refs::Range::new(a.cell(), b.cell())),
+        Area::Cell(a) => Some(crate::refs::Range::cell(a.cell())),
+        _ => None,
+    }
+}
+
+/// Where a row or column index goes after a shift along its own axis. None
+/// when it was deleted.
+pub fn shift_index(index: u32, insert: bool, at: u32, count: u32, max: u32) -> Option<u32> {
+    shift_span(index, index, insert, at, count, max).map(|(s, _)| s)
+}

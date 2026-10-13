@@ -9,12 +9,12 @@ pub mod unparse;
 // In progress (see PLAN.md, phase 3): the evaluator (eval.rs) and the
 // function library (functions/, whose per-category modules are not written
 // yet) join the build once the library is complete.
-// pub mod eval;
-// pub mod functions;
+pub mod eval;
+pub mod functions;
 
 pub use ast::{Area, BinaryOp, CellAddr, Expr, Reference, UnaryOp};
 pub use parser::{parse, ParseError};
-pub use unparse::{unparse, unparse_ooxml};
+pub use unparse::{unparse, unparse_odf, unparse_ooxml};
 
 #[cfg(test)]
 mod tests {

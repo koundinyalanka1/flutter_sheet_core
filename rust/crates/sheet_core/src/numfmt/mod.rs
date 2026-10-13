@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::datetime;
 use crate::value::{number_to_text, Value};
-pub use parse::{AmPm, Section, Token};
+pub use parse::{AmPm, Section, Token, PALETTE};
 
 /// The order the locale writes dates in, for the built-in short-date format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -207,6 +207,11 @@ impl NumberFormat {
             color: section.color,
         }
     }
+}
+
+/// The sections of a format code (for converting it to other formats).
+pub fn parse_sections_public(code: &str) -> Vec<Section> {
+    parse::parse_sections(code)
 }
 
 /// Format a value with a format code (cached parse).
