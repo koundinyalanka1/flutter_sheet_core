@@ -13,9 +13,11 @@ Done and tested in `rust/crates/sheet_core`:
   times).
 - `formula`: parsing, printing and reference adjustment.
 
-Next: the evaluator and function library (`formula/eval.rs` and
-`formula/functions/` are written in part and not yet built), recalculation,
-XLSX/CSV/ODS reading and writing, the Rust FFI layer and the Dart API.
+The Rust FFI layer (`rust/crates/sheet_ffi`) and the Dart API (`lib/`) now
+carry the library version and its error plumbing, so the workbook surface
+can grow there. Next: the evaluator and function library (`formula/eval.rs`
+and `formula/functions/` are written in part and not yet built),
+recalculation, and XLSX/CSV/ODS reading and writing.
 
 ```bash
 (cd rust && cargo test)
