@@ -24,6 +24,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "doc_cfb"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "doc_encoding"
 version = "0.1.0"
 
@@ -186,6 +193,7 @@ dependencies = [
 name = "sheet_core"
 version = "0.1.0"
 dependencies = [
+ "doc_cfb",
  "doc_encoding",
  "doc_font",
  "doc_layout",

@@ -16,6 +16,7 @@ scratch in Rust, with a Dart API over `dart:ffi`.
 | `edit` | Every edit as an `Op` (typing, formatting, rows and columns, sheets, fill, paste, sort, replace, names) with undo and redo |
 | `xlsx` | XLSX/XLSM read and in-place write: unchanged parts copied byte for byte, only changed sheets regenerated, styles and shared strings appended, `calcChain.xml` dropped |
 | `ods` | ODS read and in-place write: unchanged tables kept verbatim, OpenFormula translated both ways, comments, validations and conditional formats kept |
+| `xls` | Excel 97-2003 and WPS Spreadsheets (BIFF8 in an OLE2 file) read: values, shared strings, formulas decompiled to text (shared and array formulas, 3-D references, names), number formats, fonts, fills, borders, merges, sizes and frozen panes; saved as XLSX |
 | `csv` | CSV/TSV with encoding, delimiter and `sep=` detection; each field's text kept until edited |
 | `pdf` | Printing to PDF: pages down then across, fit-to-width for slightly wide sheets, fills, borders, alignment, wrapping, merged cells, overflowing text |
 

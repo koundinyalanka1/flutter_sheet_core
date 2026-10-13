@@ -16,6 +16,7 @@ pub mod ods;
 pub mod refs;
 pub mod style;
 pub mod value;
+pub mod xls;
 pub mod xlsx;
 
 mod io;

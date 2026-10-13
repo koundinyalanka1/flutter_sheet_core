@@ -36,6 +36,11 @@ pub fn detect_format(bytes: &[u8], name: &str) -> Option<Format> {
 impl Workbook {
     /// Read a workbook from a file's bytes; `name` gives the extension.
     pub fn open(bytes: Vec<u8>, name: &str, date_order: DateOrder) -> Result<Workbook, SheetError> {
+        // Excel 97-2003 (and WPS) workbooks, and password-protected XLSX,
+        // are compound files.
+        if doc_cfb::is_cfb(&bytes) {
+            return crate::xls::read(bytes, date_order);
+        }
         match detect_format(&bytes, name) {
             Some(Format::Xlsx) | Some(Format::Xlsm) => crate::xlsx::read(bytes, date_order),
             Some(Format::Ods) => crate::ods::read(bytes, date_order),
