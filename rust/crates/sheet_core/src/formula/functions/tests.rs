@@ -200,9 +200,31 @@ fn arithmetic_and_logic() {
             ("SWITCH(2,1,\"one\",2,\"two\",\"other\")", t("two")),
             ("SWITCH(9,1,\"one\",\"other\")", t("other")),
             ("SUM(IF(B2:B5>15,B2:B5,0))", n(50.0)),
-            ("A1:A3=\"item\"", b(true)),
+            // Outside array formulas, cells compared as a range meet the
+            // formula's row or column (Z200 meets neither): as Excel computes
+            // a formula saved without array marking.
+            ("A1:A3=\"item\"", e(CellError::Value)),
         ],
     );
+}
+
+#[test]
+fn ranges_meet_the_formulas_row_or_column() {
+    let mut g = sample();
+    let at = |g: &mut TestGrid, cell: &str, f: &str| {
+        let expr = parse(f).unwrap();
+        evaluate(g, 0, CellRef::parse_a1(cell).unwrap().0, &expr).0
+    };
+    // In row 3, B:B*2 is B3*2; in column C, A2:D2+1 is C2+1.
+    let b3 = num(g.eval("B3"));
+    assert_eq!(at(&mut g, "Z3", "$B:$B*2"), n(b3 * 2.0));
+    let c2 = g.eval("C2");
+    let c2n = match c2 { Value::Number(x) => x, _ => 0.0 };
+    assert_eq!(at(&mut g, "C40", "A2:D2+1"), n(c2n + 1.0));
+    // A function of a range, applied to each cell, meets it too.
+    assert_eq!(at(&mut g, "Z3", "ABS(-$B:$B)"), n(b3.abs()));
+    // Aggregates still see every cell.
+    assert_eq!(at(&mut g, "Z3", "SUM(B2:B5*2)"), n(2.0 * num(g.eval("SUM(B2:B5)"))));
 }
 
 #[test]

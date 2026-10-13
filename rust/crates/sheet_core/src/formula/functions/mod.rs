@@ -124,7 +124,17 @@ pub(crate) use tri_some;
 /// is a multi-cell reference or an array, `f` runs element by element with
 /// broadcasting (dynamic-array semantics) and the result is an array.
 pub(crate) fn lift(ev: &mut Evaluator, args: &[Expr], f: &mut dyn FnMut(&[Value]) -> Value) -> Eval {
-    let evals: Vec<Eval> = args.iter().map(|a| ev.eval(a)).collect();
+    // A function applied cell by cell does not count as enclosing its
+    // arguments.
+    ev.agg = ev.agg.saturating_sub(1);
+    let evals: Vec<Eval> = args
+        .iter()
+        .map(|a| {
+            let v = ev.eval(a);
+            ev.intersect_now(v)
+        })
+        .collect();
+    ev.agg += 1;
     if !evals.iter().any(|e| ev.is_multi(e)) {
         let values: Vec<Value> = evals.into_iter().map(|e| ev.scalar(e)).collect();
         return Eval::Value(f(&values));
@@ -141,7 +151,9 @@ pub(crate) fn lift(ev: &mut Evaluator, args: &[Expr], f: &mut dyn FnMut(&[Value]
             data.push(f(&values));
         }
     }
-    Eval::Array(super::eval::Array::new(rows, cols, data))
+    let mut out = super::eval::Array::new(rows, cols, data);
+    out.origin = super::eval::Array::origin_of(&arrays.iter().collect::<Vec<_>>(), rows, cols);
+    Eval::Array(out)
 }
 
 /// A one-number function applied element by element.

@@ -164,9 +164,13 @@ fn and_or(ev: &mut Evaluator, args: &[Expr], kind: Junction) -> Eval {
                     if from_ref {
                         continue;
                     }
-                    match Value::Text(t).to_bool() {
+                    // TRUE/FALSE, or a number in text ("1").
+                    match Value::Text(t.clone()).to_bool() {
                         Ok(b) => b,
-                        Err(e) => return Eval::error(e),
+                        Err(e) => match Value::Text(t).to_number() {
+                            Ok(n) => n != 0.0,
+                            Err(_) => return Eval::error(e),
+                        },
                     }
                 }
             };

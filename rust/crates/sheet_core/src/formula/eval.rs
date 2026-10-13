@@ -52,12 +52,20 @@ pub struct Array {
     pub rows: usize,
     pub cols: usize,
     pub data: Vec<Value>,
+    /// Where the range it was computed from starts, for implicit
+    /// intersection: an array from cells keeps their places.
+    pub origin: Option<CellRef>,
 }
 
 impl Array {
     pub fn new(rows: usize, cols: usize, data: Vec<Value>) -> Self {
         debug_assert_eq!(rows * cols, data.len());
-        Array { rows, cols, data }
+        Array { rows, cols, data, origin: None }
+    }
+
+    /// The origin of whichever of `arrays` has one and the result's shape.
+    pub fn origin_of(arrays: &[&Array], rows: usize, cols: usize) -> Option<CellRef> {
+        arrays.iter().find(|a| a.origin.is_some() && a.rows == rows && a.cols == cols).and_then(|a| a.origin)
     }
 
     pub fn get(&self, row: usize, col: usize) -> &Value {
@@ -146,6 +154,13 @@ pub struct Evaluator<'g> {
     pub unsupported: bool,
     /// Set when the formula used a volatile function (NOW, RAND, OFFSET...).
     pub volatile: bool,
+    /// Evaluating an array (Ctrl+Shift+Enter) formula: results stay arrays
+    /// instead of meeting the formula's row or column.
+    pub array: bool,
+    /// How many function calls enclose the expression being evaluated,
+    /// not counting ones applied cell by cell: ranges inside SUM and the
+    /// like stay ranges.
+    pub agg: u32,
 }
 
 impl<'g> Evaluator<'g> {
@@ -157,6 +172,8 @@ impl<'g> Evaluator<'g> {
             depth: 0,
             unsupported: false,
             volatile: false,
+            array: false,
+            agg: 0,
         }
     }
 
@@ -217,6 +234,11 @@ impl<'g> Evaluator<'g> {
                 }
                 Eval::Array(Array::new(rows.len(), cols, data))
             }
+            // Unary plus changes nothing (text stays text), as in Excel.
+            Expr::Unary(UnaryOp::Plus, e) => {
+                let v = self.eval(e);
+                self.intersect_now(v)
+            }
             Expr::Unary(op, e) => {
                 let v = self.eval(e);
                 self.map_values(v, &mut |x| match x.to_number() {
@@ -232,7 +254,12 @@ impl<'g> Evaluator<'g> {
                 })
             }
             Expr::Binary(op, a, b) => self.binary(*op, a, b),
-            Expr::Call(name, args) => match functions::call(self, name, args) {
+            Expr::Call(name, args) => match {
+                self.agg += 1;
+                let r = functions::call(self, name, args);
+                self.agg -= 1;
+                r
+            } {
                 Some(result) => result,
                 None => {
                     self.unsupported = true;
@@ -310,7 +337,19 @@ impl<'g> Evaluator<'g> {
 
     /// Apply a scalar operation element by element when either side is a
     /// multi-cell reference or array (dynamic-array semantics).
+    /// Outside array formulas and aggregates, a range used where one value
+    /// is wanted meets the formula's row or column at once (Excel's implicit
+    /// intersection), so `=$A:$A*2` is this row's A doubled.
+    pub fn intersect_now(&mut self, v: Eval) -> Eval {
+        match v {
+            Eval::Ref(_) if !self.array && self.agg == 0 && self.is_multi(&v) => Eval::Value(self.scalar(v)),
+            v => v,
+        }
+    }
+
     pub fn lift2(&mut self, a: Eval, b: Eval, f: &mut dyn FnMut(&Value, &Value) -> Value) -> Eval {
+        let a = self.intersect_now(a);
+        let b = self.intersect_now(b);
         let a_multi = self.is_multi(&a);
         let b_multi = self.is_multi(&b);
         if !a_multi && !b_multi {
@@ -327,11 +366,14 @@ impl<'g> Evaluator<'g> {
                 data.push(f(&x.broadcast(r, c), &y.broadcast(r, c)));
             }
         }
-        Eval::Array(Array::new(rows, cols, data))
+        let mut out = Array::new(rows, cols, data);
+        out.origin = Array::origin_of(&[&x, &y], rows, cols);
+        Eval::Array(out)
     }
 
     /// Apply a scalar operation to every element.
     pub fn map_values(&mut self, v: Eval, f: &mut dyn FnMut(&Value) -> Value) -> Eval {
+        let v = self.intersect_now(v);
         if self.is_multi(&v) {
             let mut arr = self.to_array(v);
             for x in arr.data.iter_mut() {
@@ -393,7 +435,9 @@ impl<'g> Evaluator<'g> {
                     let c = (cell.col - range.start.col) as usize;
                     data[r * cols + c] = value;
                 }
-                Array::new(rows, cols, data)
+                let mut a = Array::new(rows, cols, data);
+                a.origin = Some(range.start);
+                a
             }
         }
     }
@@ -404,6 +448,19 @@ impl<'g> Evaluator<'g> {
     pub fn scalar(&mut self, v: Eval) -> Value {
         match v {
             Eval::Value(x) => x,
+            // Values computed from cells meet this formula's row or column,
+            // as the cells themselves would (outside array formulas).
+            Eval::Array(a) if !self.array && a.rows * a.cols > 1 && a.origin.is_some() => {
+                let o = a.origin.unwrap();
+                let (row, col) = (self.cell.row as i64 - o.row as i64, self.cell.col as i64 - o.col as i64);
+                if a.cols == 1 && (0..a.rows as i64).contains(&row) {
+                    a.get(row as usize, 0).clone()
+                } else if a.rows == 1 && (0..a.cols as i64).contains(&col) {
+                    a.get(0, col as usize).clone()
+                } else {
+                    Value::Error(CellError::Value)
+                }
+            }
             Eval::Array(a) => a.data.into_iter().next().unwrap_or(Value::Empty),
             Eval::Ref(areas) => {
                 if areas.len() != 1 {

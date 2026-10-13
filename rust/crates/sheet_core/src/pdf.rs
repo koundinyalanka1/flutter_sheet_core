@@ -186,18 +186,21 @@ fn export_sheet(wb: &Workbook, si: usize, book: &mut FontBook, pdf: &mut Pdf, op
                 let x1 = cols.iter().position(|x| *x > m.end.col).unwrap_or(cols.len()) as i64 - c0 as i64;
                 let y0 = rows.iter().position(|x| *x >= m.start.row).map(|i| i as i64 - r0 as i64)?;
                 let y1 = rows.iter().position(|x| *x > m.end.row).unwrap_or(rows.len()) as i64 - r0 as i64;
-                let edge = |v: &[f32], sizes: &[f32], k: i64| -> f32 {
+                // An edge `k` columns (rows) from the page's first, where
+                // `v` holds the page's edges and `all` every size.
+                let edge = |v: &[f32], all: &[f32], base: usize, k: i64| -> f32 {
                     if k < 0 {
-                        -sizes[..(-k) as usize].iter().sum::<f32>()
+                        let from = (base as i64 + k).max(0) as usize;
+                        -all[from.min(base)..base.min(all.len())].iter().sum::<f32>()
                     } else if (k as usize) < v.len() {
                         v[k as usize]
                     } else {
-                        *v.last().unwrap() + sizes[..(k as usize + 1 - v.len()).min(sizes.len())].iter().sum::<f32>()
+                        let from = (base + v.len() - 1).min(all.len());
+                        let to = (base + k as usize).min(all.len()).max(from);
+                        *v.last().unwrap() + all[from..to].iter().sum::<f32>()
                     }
                 };
-                let wpage: Vec<f32> = widths[c0..].to_vec();
-                let hpage: Vec<f32> = heights[r0..].to_vec();
-                Some((m, edge(&xs, &wpage, x0), edge(&ys, &hpage, y0), edge(&xs, &wpage, x1), edge(&ys, &hpage, y1)))
+                Some((m, edge(&xs, &widths, c0, x0), edge(&ys, &heights, r0, y0), edge(&xs, &widths, c0, x1), edge(&ys, &heights, r0, y1)))
             };
             // Fills first.
             for (ri, &r) in rows[r0..r1].iter().enumerate() {

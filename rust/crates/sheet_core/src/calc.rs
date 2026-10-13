@@ -415,6 +415,7 @@ impl<'w> Calc<'w> {
             }
             Some(range) => {
                 let mut ev = Evaluator::new(self, key.0, key.1);
+                ev.array = true;
                 let result = ev.eval(&expr);
                 let unsupported = ev.unsupported;
                 let arr = match result {

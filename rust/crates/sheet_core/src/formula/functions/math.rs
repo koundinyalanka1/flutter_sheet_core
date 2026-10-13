@@ -436,12 +436,20 @@ fn pairs_sum(ev: &mut Evaluator, args: &[Expr], f: fn(f64, f64) -> f64) -> Eval 
         return Eval::error(CellError::NA);
     }
     let mut total = 0.0;
+    let mut pairs = 0;
     for (a, b) in x.data.iter().zip(&y.data) {
         match (a, b) {
             (Value::Error(e), _) | (_, Value::Error(e)) => return Eval::error(*e),
-            (Value::Number(p), Value::Number(q)) => total += f(*p, *q),
+            (Value::Number(p), Value::Number(q)) => {
+                total += f(*p, *q);
+                pairs += 1;
+            }
             _ => {}
         }
+    }
+    // No pair of numbers at all: Excel's #DIV/0!.
+    if pairs == 0 {
+        return Eval::error(CellError::Div0);
     }
     Eval::number(total)
 }

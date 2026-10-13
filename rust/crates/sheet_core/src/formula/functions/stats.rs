@@ -48,6 +48,9 @@ pub fn call(ev: &mut Evaluator, name: &str, args: &[Expr]) -> Option<Eval> {
         "VARP" | "VAR.P" => with_numbers(ev, args, false, |n| variance(n, false)),
         "VARPA" => with_numbers(ev, args, true, |n| variance(n, false)),
         "AVEDEV" => with_numbers(ev, args, false, |n| {
+            if n.is_empty() {
+                return Err(CellError::Num);
+            }
             let m = mean(n)?;
             Ok(n.iter().map(|x| (x - m).abs()).sum::<f64>() / n.len() as f64)
         }),
