@@ -365,3 +365,159 @@ fn exports_sheets_to_pdf() {
     }
 }
 
+
+// --- Flat OpenDocument spreadsheets
+
+/// A workbook as a flat file, laid out the way an office suite writes one:
+/// view settings (the active sheet, frozen panes), a data style, bold and
+/// percentage cell styles, formulas, repeated rows and a merged cell.
+const FLAT_BILLS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0" xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">
+ <office:settings>
+  <config:config-item-set config:name="ooo:view-settings">
+   <config:config-item-map-indexed config:name="Views">
+    <config:config-item-map-entry>
+     <config:config-item config:name="ActiveTable" config:type="string">Bills</config:config-item>
+     <config:config-item-map-named config:name="Tables">
+      <config:config-item-map-entry config:name="Bills">
+       <config:config-item config:name="HorizontalSplitMode" config:type="short">2</config:config-item>
+       <config:config-item config:name="VerticalSplitMode" config:type="short">2</config:config-item>
+       <config:config-item config:name="HorizontalSplitPosition" config:type="int">1</config:config-item>
+       <config:config-item config:name="VerticalSplitPosition" config:type="int">1</config:config-item>
+      </config:config-item-map-entry>
+     </config:config-item-map-named>
+    </config:config-item-map-entry>
+   </config:config-item-map-indexed>
+  </config:config-item-set>
+ </office:settings>
+ <office:styles>
+  <style:default-style style:family="table-cell"><style:text-properties fo:font-size="10pt"/></style:default-style>
+  <number:percentage-style style:name="N11"><number:number number:decimal-places="0" number:min-integer-digits="1"/><number:text>%</number:text></number:percentage-style>
+  <style:style style:name="Default" style:family="table-cell"/>
+ </office:styles>
+ <office:automatic-styles>
+  <style:style style:name="co1" style:family="table-column"><style:table-column-properties style:column-width="3cm"/></style:style>
+  <style:style style:name="ce1" style:family="table-cell" style:parent-style-name="Default"><style:text-properties fo:font-weight="bold"/></style:style>
+  <style:style style:name="ce2" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N11"/>
+  <style:page-layout style:name="pm1"/>
+ </office:automatic-styles>
+ <office:master-styles><style:master-page style:name="Default" style:page-layout-name="pm1"/></office:master-styles>
+ <office:body>
+  <office:spreadsheet>
+   <table:table table:name="Notes"><table:table-row><table:table-cell office:value-type="string"><text:p>See Bills</text:p></table:table-cell></table:table-row></table:table>
+   <table:table table:name="Bills">
+    <table:table-column table:style-name="co1" table:number-columns-repeated="3"/>
+    <table:table-row><table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Item</text:p></table:table-cell><table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Amount</text:p></table:table-cell><table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Share</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Rent</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="1200"><text:p>1200</text:p></table:table-cell><table:table-cell table:style-name="ce2" table:formula="of:=[.B2]/[.B4]" office:value-type="percentage" office:value="0.8"><text:p>80%</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Power</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="300"><text:p>300</text:p></table:table-cell><table:table-cell table:style-name="ce2" table:formula="of:=[.B3]/[.B4]" office:value-type="percentage" office:value="0.2"><text:p>20%</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Total</text:p></table:table-cell><table:table-cell table:formula="of:=SUM([.B2:.B3])" office:value-type="float" office:value="1500"><text:p>1500</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row table:number-rows-repeated="2"><table:table-cell table:number-columns-repeated="3"/></table:table-row>
+    <table:table-row><table:table-cell table:number-columns-spanned="2" table:number-rows-spanned="1" office:value-type="string"><text:p>Merged note</text:p></table:table-cell><table:covered-table-cell/><table:table-cell/></table:table-row>
+   </table:table>
+  </office:spreadsheet>
+ </office:body>
+</office:document>
+"#;
+
+#[test]
+fn flat_ods_opens_and_saves_as_ods() {
+    use crate::model::Imported;
+    // Told by its content, whatever its name says.
+    for name in ["bills.fods", "bills.xml", "bills.csv", "bills"] {
+        let wb = Workbook::open(FLAT_BILLS.as_bytes().to_vec(), name, DateOrder::Dmy).unwrap();
+        assert_eq!(wb.imported, Some(Imported::Fods), "{name}");
+    }
+    let mut wb = Workbook::open(FLAT_BILLS.as_bytes().to_vec(), "bills.fods", DateOrder::Dmy).unwrap();
+    assert_eq!(wb.format, Some(Format::Ods));
+    assert!(!wb.writes_back());
+    assert_eq!(wb.save_format(), Format::Ods);
+    assert!(wb.warnings[0].contains("(.fods)") && wb.warnings[0].contains("(.ods)"), "{:?}", wb.warnings);
+    assert_eq!(wb.sheets.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["Notes", "Bills"]);
+    assert_eq!(wb.active, 1);
+    assert_eq!(wb.sheets[1].freeze, Some(at("B2")));
+    assert_eq!(val(&wb, 0, "A1"), Value::text("See Bills"));
+    assert_eq!(val(&wb, 1, "B4"), n(1500.0));
+    assert_eq!(formula(&wb, 1, "B4").as_deref(), Some("SUM(B2:B3)"));
+    assert_eq!(formula(&wb, 1, "C2").as_deref(), Some("B2/B4"));
+    assert!(wb.styles.get(wb.sheets[1].cell(at("A1")).unwrap().style).font.bold);
+    assert_eq!(wb.styles.get(wb.sheets[1].cell(at("C2")).unwrap().style).num_fmt, "0%");
+    assert_eq!(wb.sheets[1].merges, vec![range("A7:B7")]);
+    assert!((wb.sheets[1].col_width(2) - wb.sheets[1].col_width(0)).abs() < 1e-9);
+
+    // Edit, save as ODS, and reopen.
+    set(&mut wb, 1, "B3", "500");
+    assert_eq!(val(&wb, 1, "B4"), n(1700.0));
+    let bytes = wb.to_bytes(wb.save_format()).unwrap();
+    assert_eq!(&bytes[30..38], b"mimetype");
+    assert_eq!(&bytes[38..38 + doc_odf::SPREADSHEET.len()], doc_odf::SPREADSHEET.as_bytes());
+    wb.saved(Format::Ods, bytes.clone()).unwrap();
+    assert!(!wb.dirty);
+    let back = Workbook::open(bytes, "bills.ods", DateOrder::Dmy).unwrap();
+    assert_eq!(back.imported, None);
+    assert!(back.writes_back());
+    assert!(back.warnings.iter().all(|w| !w.contains(".fods")), "{:?}", back.warnings);
+    assert_eq!(back.sheets.len(), 2);
+    assert_eq!(val(&back, 1, "B4"), n(1700.0));
+    assert_eq!(val(&back, 1, "B3"), n(500.0));
+    assert_eq!(formula(&back, 1, "C3").as_deref(), Some("B3/B4"));
+    assert_eq!(val(&back, 0, "A1"), Value::text("See Bills"));
+    assert_eq!(back.sheets[1].freeze, Some(at("B2")));
+    assert_eq!(back.sheets[1].merges, vec![range("A7:B7")]);
+
+    // A flat file of another kind is no spreadsheet; a damaged one is
+    // reported as damaged.
+    let text = FLAT_BILLS.replace("opendocument.spreadsheet", "opendocument.text");
+    assert!(matches!(Workbook::open(text.into_bytes(), "bills.fods", DateOrder::Dmy), Err(crate::SheetError::Unsupported(_))));
+    let cut = FLAT_BILLS.as_bytes()[..FLAT_BILLS.len() / 2].to_vec();
+    assert!(matches!(Workbook::open(cut, "bills.fods", DateOrder::Dmy), Err(crate::SheetError::Corrupt(_))));
+}
+
+#[test]
+fn flattened_ods_reads_like_its_package() {
+    // The budget of the ODS round trip: formats, a merge, frozen panes, a
+    // wider column and a second sheet referring to the first.
+    let mut wb = budget();
+    wb.apply(Op::Format {
+        sheet: 0,
+        ranges: vec![range("A1:D1")],
+        patch: StylePatch {
+            bold: Some(true),
+            ..StylePatch::default()
+        },
+    })
+    .unwrap();
+    wb.apply(Op::Merge { sheet: 0, range: range("A8:B9") }).unwrap();
+    wb.apply(Op::Freeze { sheet: 0, at: Some(at("B2")) }).unwrap();
+    wb.apply(Op::ColWidth { sheet: 0, first: 1, last: 1, width: Some(15.0) }).unwrap();
+    wb.apply(Op::AddSheet { name: Some("Second Sheet".into()), at: None }).unwrap();
+    set(&mut wb, 1, "A1", "='Second Sheet'!B1+Sheet1!D4");
+    set(&mut wb, 1, "B1", "5");
+    let package = wb.to_bytes(Format::Ods).unwrap();
+    let flat = doc_odf::flatten(&package).unwrap();
+
+    let original = Workbook::open(package, "budget.ods", DateOrder::Dmy).unwrap();
+    let mut from_flat = Workbook::open(flat, "budget.fods", DateOrder::Dmy).unwrap();
+    assert_eq!(from_flat.imported, Some(crate::model::Imported::Fods));
+    assert_eq!(from_flat.active, original.active);
+    assert_eq!(from_flat.sheets.len(), original.sheets.len());
+    for (a, b) in from_flat.sheets.iter().zip(&original.sheets) {
+        assert_eq!(a.name, b.name);
+        assert_eq!(a.cells, b.cells, "{}", a.name);
+        assert_eq!(a.merges, b.merges);
+        assert_eq!(a.freeze, b.freeze);
+        for col in 0..6 {
+            assert_eq!(a.col_width(col), b.col_width(col));
+        }
+        for row in a.cells.values() {
+            for cell in row.values() {
+                assert_eq!(from_flat.styles.get(cell.style), original.styles.get(cell.style));
+            }
+        }
+    }
+    // Saved as ODS, it reads the same again.
+    set(&mut from_flat, 1, "B1", "6");
+    let again = Workbook::open(from_flat.to_bytes(Format::Ods).unwrap(), "budget.ods", DateOrder::Dmy).unwrap();
+    assert_eq!(val(&again, 1, "A1"), n(1011.0));
+    assert_eq!(again.sheets[0].cells, original.sheets[0].cells);
+    assert_eq!(again.sheets[0].freeze, Some(at("B2")));
+}

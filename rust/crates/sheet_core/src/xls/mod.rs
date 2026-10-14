@@ -15,7 +15,7 @@ use std::sync::Arc;
 use doc_cfb::Cfb;
 
 use crate::error::SheetError;
-use crate::model::{Cell, CellExtra, ColInfo, DefinedName, Formula, RowInfo, Sheet, SheetState, Workbook};
+use crate::model::{Cell, CellExtra, ColInfo, DefinedName, Formula, Imported, RowInfo, Sheet, SheetState, Workbook};
 use crate::numfmt::{builtin_format, DateOrder, FormatOptions};
 use crate::refs::{CellRef, Range};
 use crate::style::{Align, Border, CellStyle, ColorSpec, Edge, Fill, Font, StyleTable, Theme, Underline};
@@ -475,6 +475,7 @@ pub fn read(bytes: Vec<u8>, date_order: DateOrder) -> Result<Workbook, SheetErro
         date1904: g.date1904,
         date_order,
         format: None,
+        imported: Some(Imported::Xls),
         ..Workbook::default()
     };
     wb.warnings.push("This is an Excel 97-2003 workbook (.xls). It will be saved as an Excel workbook (.xlsx).".into());

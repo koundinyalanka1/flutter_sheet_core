@@ -62,6 +62,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "doc_odf"
+version = "0.1.0"
+dependencies = [
+ "doc_xml",
+ "doc_zip",
+ "thiserror",
+]
+
+[[package]]
 name = "doc_opc"
 version = "0.1.0"
 dependencies = [
@@ -197,6 +206,7 @@ dependencies = [
  "doc_encoding",
  "doc_font",
  "doc_layout",
+ "doc_odf",
  "doc_opc",
  "doc_pdf",
  "doc_xml",

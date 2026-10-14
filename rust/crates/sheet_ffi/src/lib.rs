@@ -88,7 +88,8 @@ pub unsafe extern "C" fn sheet_free_string(ptr: *mut c_char) {
     doc_ffi::free_c_string(ptr)
 }
 
-/// Open a workbook (XLSX, XLSM, ODS, CSV, TSV). `name` gives the file name
+/// Open a workbook (XLSX, XLSM, ODS, CSV, TSV; XLS and flat ODS, `.fods`,
+/// are imported and saved as XLSX and ODS). `name` gives the file name
 /// for its extension (the path may not have one, e.g. a content URI copy);
 /// NULL uses `path`. `options_json`: `{"dateOrder":"dmy","utcOffsetMinutes":330}`.
 /// Returns a handle, or -1.
@@ -161,6 +162,9 @@ fn info(wb: &Workbook) -> Json {
         .collect();
     json!({
         "format": wb.format.map(|f| f.name()),
+        "importedFrom": wb.imported.map(|i| i.name()),
+        "writesBack": wb.writes_back(),
+        "saveFormat": wb.save_format().name(),
         "sheets": sheets,
         "active": wb.active,
         "modified": wb.dirty,
@@ -175,7 +179,10 @@ fn info(wb: &Workbook) -> Json {
 
 /// The workbook: format, sheets (name, state, used range, frozen panes),
 /// active sheet, whether it has unsaved edits, undo/redo availability,
-/// warnings and circular references.
+/// warnings and circular references. A file read but not written back has
+/// `importedFrom` (`xls`, `fods`) and `writesBack` false; `saveFormat` is
+/// the format to save it as (`xlsx`, or `ods` for a flat `.fods`), to a
+/// new file with that extension.
 #[no_mangle]
 pub extern "C" fn sheet_info_json(handle: i64) -> *mut c_char {
     call_str(|| BOOKS.with(handle, |wb| to_json(&info(wb))))
@@ -896,6 +903,54 @@ mod tests {
         let v: Json = serde_json::from_str(&take(unsafe { sheet_evaluate_json(h2, 0, 5, 5, f.as_ptr()) })).unwrap();
         assert_eq!(v["value"], json!(36.0));
         assert_eq!(sheet_close(h2), 0);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn flat_ods_saves_as_ods() {
+        let flat = concat!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+            r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+            r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3" "#,
+            r#"office:mimetype="application/vnd.oasis.opendocument.spreadsheet">"#,
+            r#"<office:body><office:spreadsheet><table:table table:name="Bills"><table:table-row>"#,
+            r#"<table:table-cell office:value-type="float" office:value="12"><text:p>12</text:p></table:table-cell>"#,
+            r#"<table:table-cell table:formula="of:=[.A1]*2" office:value-type="float" office:value="24"><text:p>24</text:p></table:table-cell>"#,
+            "</table:table-row></table:table></office:spreadsheet></office:body></office:document>",
+        );
+        let dir = std::env::temp_dir().join(format!("sheet_ffi_flat_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bills.fods");
+        std::fs::write(&path, flat).unwrap();
+        let p = c(path.to_str().unwrap());
+        let h = unsafe { sheet_open(p.as_ptr(), std::ptr::null(), std::ptr::null()) };
+        assert!(h > 0, "{}", doc_ffi::last_error());
+        let info: Json = serde_json::from_str(&take(sheet_info_json(h))).unwrap();
+        assert_eq!(info["format"], json!("ods"));
+        assert_eq!(info["importedFrom"], json!("fods"));
+        assert_eq!(info["writesBack"], json!(false));
+        assert_eq!(info["saveFormat"], json!("ods"));
+        assert!(info["warnings"][0].as_str().unwrap().contains("(.ods)"));
+        assert_eq!(info["sheets"][0]["name"], json!("Bills"));
+        apply(h, json!({"op": "set", "sheet": 0, "row": 0, "col": 0, "input": "20"}));
+
+        let out = dir.join("bills.ods");
+        let o = c(out.to_str().unwrap());
+        let fmt = c("ods");
+        let saved: Json = serde_json::from_str(&take(unsafe { sheet_save(h, o.as_ptr(), fmt.as_ptr()) })).unwrap();
+        assert_eq!(saved["warnings"], json!([]));
+        assert_eq!(sheet_close(h), 0);
+        let h = unsafe { sheet_open(o.as_ptr(), std::ptr::null(), std::ptr::null()) };
+        assert!(h > 0, "{}", doc_ffi::last_error());
+        let info: Json = serde_json::from_str(&take(sheet_info_json(h))).unwrap();
+        assert_eq!(info["importedFrom"], Json::Null);
+        assert_eq!(info["writesBack"], json!(true));
+        assert_eq!(info["saveFormat"], json!("ods"));
+        let cells: Json = serde_json::from_str(&take(sheet_cells_json(h, 0, 0, 0, 10, 10))).unwrap();
+        let shown: Vec<&Json> = cells["cells"].as_array().unwrap().iter().map(|c| &c[2]).collect();
+        assert_eq!(shown, [&json!("20"), &json!("40")]);
+        assert_eq!(sheet_close(h), 0);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

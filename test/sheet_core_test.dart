@@ -91,6 +91,44 @@ void main() {
     await dir.delete(recursive: true);
   }, skip: !available);
 
+  test('opens a flat OpenDocument spreadsheet and saves it as ODS', () async {
+    final dir = await Directory.systemTemp.createTemp('sheet_core_flat');
+    final flat = File('${dir.path}/bills.fods');
+    await flat.writeAsString(
+      '<?xml version="1.0" encoding="UTF-8"?>'
+      '<office:document '
+      'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+      'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+      'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+      'office:version="1.3" '
+      'office:mimetype="application/vnd.oasis.opendocument.spreadsheet">'
+      '<office:body><office:spreadsheet><table:table table:name="Bills">'
+      '<table:table-row><table:table-cell office:value-type="float" '
+      'office:value="12"><text:p>12</text:p></table:table-cell>'
+      '</table:table-row></table:table></office:spreadsheet></office:body>'
+      '</office:document>',
+    );
+    final book = await SheetCore.open(flat.path);
+    final info = book.info();
+    expect(info.importedFrom, 'fods');
+    expect(info.writesBack, isFalse);
+    expect(info.saveFormat, SheetFormat.ods);
+    expect(info.format, SheetFormat.ods);
+    expect(info.warnings.first, contains('(.ods)'));
+    expect(book.cell(0, 0, 0).text, '12');
+    book.setCell(0, 0, 1, '=A1*2');
+
+    final path = '${dir.path}/bills.${info.saveFormat.code}';
+    expect(await book.save(path, info.saveFormat), isEmpty);
+    book.close();
+    final again = await SheetCore.open(path);
+    expect(again.info().importedFrom, isNull);
+    expect(again.info().writesBack, isTrue);
+    expect(again.cell(0, 0, 1).text, '24');
+    again.close();
+    await dir.delete(recursive: true);
+  }, skip: !available);
+
   test('prints a workbook to PDF', () async {
     final book = SheetCore.create();
     book.setCell(0, 0, 0, 'Item');

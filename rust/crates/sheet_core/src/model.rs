@@ -354,6 +354,33 @@ impl Format {
     }
 }
 
+/// Formats a workbook is read from but not written back: saving writes
+/// [`Imported::save_format`] to a new file instead.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Imported {
+    /// Excel 97-2003 and WPS Spreadsheets (`.xls`, `.et`).
+    Xls,
+    /// A flat OpenDocument spreadsheet (`.fods`, one XML file).
+    Fods,
+}
+
+impl Imported {
+    pub fn name(self) -> &'static str {
+        match self {
+            Imported::Xls => "xls",
+            Imported::Fods => "fods",
+        }
+    }
+
+    /// The format such a workbook is saved as.
+    pub fn save_format(self) -> Format {
+        match self {
+            Imported::Xls => Format::Xlsx,
+            Imported::Fods => Format::Ods,
+        }
+    }
+}
+
 /// A whole workbook.
 #[derive(Debug)]
 pub struct Workbook {
@@ -366,6 +393,9 @@ pub struct Workbook {
     pub source: Source,
     /// The format the workbook was read from (None for a new one).
     pub format: Option<Format>,
+    /// The format of the file it was opened from, when that is not written
+    /// back (an `.xls`, a flat `.fods`).
+    pub imported: Option<Imported>,
     /// The locale's date order, for typed dates and criteria.
     pub date_order: crate::numfmt::DateOrder,
     /// Things the reader could not keep or understand, worded for people.
@@ -393,6 +423,7 @@ impl Default for Workbook {
             active: 0,
             source: Source::New,
             format: None,
+            imported: None,
             date_order: Default::default(),
             warnings: Vec::new(),
             structure_changed: false,
@@ -411,6 +442,22 @@ impl Workbook {
         Workbook {
             sheets: vec![Sheet::new("Sheet1")],
             ..Workbook::default()
+        }
+    }
+
+    /// Whether saving writes the file it was opened from back in its own
+    /// format (true for a new workbook).
+    pub fn writes_back(&self) -> bool {
+        self.imported.is_none()
+    }
+
+    /// The format saving writes: the workbook's own when it is written
+    /// back, otherwise the modern equivalent of what it was read from;
+    /// XLSX for a new workbook.
+    pub fn save_format(&self) -> Format {
+        match self.imported {
+            Some(imported) => imported.save_format(),
+            None => self.format.unwrap_or(Format::Xlsx),
         }
     }
 

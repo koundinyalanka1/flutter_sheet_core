@@ -204,6 +204,9 @@ class SheetName {
 class WorkbookInfo {
   const WorkbookInfo({
     required this.format,
+    required this.importedFrom,
+    required this.writesBack,
+    required this.saveFormat,
     required this.sheets,
     required this.active,
     required this.modified,
@@ -216,6 +219,12 @@ class WorkbookInfo {
 
   factory WorkbookInfo.fromJson(Map<String, dynamic> j) => WorkbookInfo(
     format: SheetFormat.fromCode(j['format'] as String?),
+    importedFrom: j['importedFrom'] as String?,
+    writesBack: j['writesBack'] as bool? ?? true,
+    saveFormat:
+        SheetFormat.fromCode(j['saveFormat'] as String?) ??
+        SheetFormat.fromCode(j['format'] as String?) ??
+        SheetFormat.xlsx,
     sheets: [
       for (final s in (j['sheets'] as List).cast<Map<String, dynamic>>())
         SheetInfo.fromJson(s),
@@ -242,6 +251,19 @@ class WorkbookInfo {
 
   /// The format it was read from or last saved in; null for a new one.
   final SheetFormat? format;
+
+  /// The format of the file it was opened from when that is not written
+  /// back: `xls` (Excel 97-2003, WPS) or `fods` (a flat OpenDocument
+  /// spreadsheet); null otherwise.
+  final String? importedFrom;
+
+  /// Whether saving writes the opened file back in its own format. When
+  /// false, save to a new file whose extension is [saveFormat]'s code.
+  final bool writesBack;
+
+  /// The format saving writes: [format] when [writesBack]; otherwise
+  /// [SheetFormat.xlsx] for `xls`, or [SheetFormat.ods] for `fods`.
+  final SheetFormat saveFormat;
   final List<SheetInfo> sheets;
   final int active;
 

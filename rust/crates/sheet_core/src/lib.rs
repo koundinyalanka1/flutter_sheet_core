@@ -22,7 +22,7 @@ pub mod xlsx;
 mod io;
 
 pub use error::SheetError;
-pub use model::{Cell, Format, Sheet, Workbook};
+pub use model::{Cell, Format, Imported, Sheet, Workbook};
 pub use refs::{CellRef, Range};
 pub use value::{CellError, Value};
 

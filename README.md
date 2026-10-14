@@ -20,6 +20,12 @@ scratch in Rust, with a Dart API over `dart:ffi`.
 | `csv` | CSV/TSV with encoding, delimiter and `sep=` detection; each field's text kept until edited |
 | `pdf` | Printing to PDF: pages down then across, fit-to-width for slightly wide sheets, fills, borders, alignment, wrapping, merged cells, overflowing text |
 
+A flat OpenDocument spreadsheet (`.fods`, one XML file, told by its
+content) is turned into the package it stands for by `doc_odf` and read as
+ODS. Like an `.xls`, it is not written back: `WorkbookInfo.importedFrom`
+names it (`fods`, `xls`), `writesBack` is false, and `saveFormat` (ODS)
+is what to save it as, in a new file.
+
 `rust/crates/sheet_ffi` exports the engine to Dart (`sheet_open`,
 `sheet_cells_json`, `sheet_apply`, `sheet_save`, ...). `lib/` holds the Dart
 API: `SheetCore.open/create` return a `SheetBook`.

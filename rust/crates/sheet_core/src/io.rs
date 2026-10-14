@@ -1,7 +1,7 @@
 //! Opening and saving workbooks in any supported format.
 
 use crate::error::SheetError;
-use crate::model::{Format, Source, Workbook};
+use crate::model::{Format, Imported, Source, Workbook};
 use crate::numfmt::DateOrder;
 
 /// Sniff the format of a file from its bytes and name.
@@ -36,6 +36,18 @@ pub fn detect_format(bytes: &[u8], name: &str) -> Option<Format> {
 impl Workbook {
     /// Read a workbook from a file's bytes; `name` gives the extension.
     pub fn open(bytes: Vec<u8>, name: &str, date_order: DateOrder) -> Result<Workbook, SheetError> {
+        // A flat OpenDocument spreadsheet is XML whatever its name: it is
+        // read as the package it stands for, and saved as one.
+        if let Some(mimetype) = doc_odf::flat_mimetype(&bytes) {
+            if !mimetype.starts_with(doc_odf::SPREADSHEET) {
+                return Err(SheetError::Unsupported("This OpenDocument file is not a spreadsheet.".into()));
+            }
+            let package = doc_odf::unflatten(&bytes).map_err(|e| SheetError::Corrupt(format!("This spreadsheet is damaged: {e}.")))?;
+            let mut wb = crate::ods::read(package, date_order)?;
+            wb.imported = Some(Imported::Fods);
+            wb.warnings.insert(0, "This is a flat OpenDocument spreadsheet (.fods). It will be saved as an OpenDocument spreadsheet (.ods).".into());
+            return Ok(wb);
+        }
         // Excel 97-2003 (and WPS) workbooks, and password-protected XLSX,
         // are compound files.
         if doc_cfb::is_cfb(&bytes) {

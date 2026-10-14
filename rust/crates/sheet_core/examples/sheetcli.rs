@@ -1,9 +1,11 @@
-//! A developer tool for trying real files.
+//! A developer tool for trying real files: any workbook the engine reads,
+//! flat OpenDocument spreadsheets (`.fods`) included.
 //!
 //! ```text
 //! sheetcli dump  FILE                 print every sheet's cells
 //! sheetcli set   FILE OUT CELL=INPUT  edit cells (Sheet!A1=text) and save
-//! sheetcli conv  FILE OUT             open and save in OUT's format
+//! sheetcli conv  FILE OUT             open and save in OUT's format (the
+//!                                     workbook's save format for others)
 //! sheetcli recalc FILE                recalculate everything, show differences
 //! sheetcli pdf   FILE OUT              print to PDF
 //! ```
@@ -16,7 +18,12 @@ fn open(path: &str) -> Workbook {
     let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("{path}: {e}"));
     let started = std::time::Instant::now();
     let wb = Workbook::open(bytes, path, DateOrder::Dmy).unwrap_or_else(|e| panic!("{path}: {e}"));
-    eprintln!("opened in {:?}", started.elapsed());
+    eprintln!(
+        "opened {} in {:?} (saves as {})",
+        wb.imported.map(|i| i.name()).or(wb.format.map(|f| f.name())).unwrap_or("?"),
+        started.elapsed(),
+        wb.save_format().name()
+    );
     for w in &wb.warnings {
         eprintln!("warning: {w}");
     }
@@ -24,7 +31,7 @@ fn open(path: &str) -> Workbook {
 }
 
 fn save(wb: &mut Workbook, out: &str) {
-    let format = Format::from_name(out.rsplit('.').next().unwrap_or("xlsx")).unwrap_or(Format::Xlsx);
+    let format = Format::from_name(out.rsplit('.').next().unwrap_or("")).unwrap_or(wb.save_format());
     let bytes = wb.to_bytes(format).unwrap_or_else(|e| panic!("{out}: {e}"));
     std::fs::write(out, &bytes).unwrap();
 }
