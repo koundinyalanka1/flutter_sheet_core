@@ -1,0 +1,16 @@
+# The spreadsheet engine behind flutter_sheet_core.
+[workspace]
+resolver = "2"
+members = ["crates/sheet_core", "crates/sheet_ffi"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+# Line tables let Crashlytics name the function and line of a native crash
+# (its symbol upload reads the unstripped library); Android packaging strips
+# them from the APK.
+debug = "line-tables-only"
+
+[profile.test]
+opt-level = 1

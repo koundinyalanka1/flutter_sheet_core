@@ -1,0 +1,9 @@
+.dart_tool/
+/build/
+/pubspec.lock
+.flutter-plugins-dependencies
+# Native build output; rebuild with scripts/build_libs.sh.
+/rust/target/
+/android/src/main/jniLibs/*/
+/macos/Frameworks/*.dylib
+/ios/Frameworks/

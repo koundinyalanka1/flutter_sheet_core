@@ -1,0 +1,28 @@
+name: flutter_sheet_core
+description: "DocHelper's spreadsheet engine: Excel values, dates, number formats and formulas, and XLSX, ODS and CSV reading and writing, built from scratch in Rust."
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.10.4
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+# An FFI plugin: the Rust library is prebuilt by scripts/build_libs.sh
+# (in the app repository) into android/src/main/jniLibs and macos/Frameworks.
+flutter:
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      macos:
+        ffiPlugin: true
